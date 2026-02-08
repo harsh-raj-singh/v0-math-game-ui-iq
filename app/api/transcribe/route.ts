@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     // Forward to Groq Whisper API
     const groqFormData = new FormData();
     groqFormData.append("file", audioFile, "audio.webm");
-    groqFormData.append("model", "whisper-large-v3-turbo");
+    groqFormData.append("model", "distil-whisper-large-v3-en");
     groqFormData.append("language", "en");
     groqFormData.append("response_format", "json");
     groqFormData.append("temperature", "0.0");

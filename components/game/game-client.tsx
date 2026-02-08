@@ -28,6 +28,8 @@ import {
   Square,
 } from "lucide-react";
 
+const TOTAL_QUESTIONS = 20;
+
 type GameState = "idle" | "playing" | "feedback" | "ended";
 type FeedbackType = "correct" | "incorrect" | null;
 type OverlayType = "settings" | "stats" | "help" | null;
@@ -37,6 +39,7 @@ interface GameStats {
   wrong: number;
   streak: number;
   bestStreak: number;
+  questionNumber: number;
   startTime: number | null;
 }
 
@@ -107,6 +110,7 @@ export function GameClient() {
       wrong: 0,
       streak: 0,
       bestStreak: 0,
+      questionNumber: 1,
       startTime: Date.now(),
     });
     nextProblem();
@@ -142,6 +146,8 @@ export function GameClient() {
 
       setUserAnswer(String(parsed));
 
+      const isLastQuestion = stats.questionNumber >= TOTAL_QUESTIONS;
+
       if (parsed === problem.answer) {
         setFeedback("correct");
         setStats((prev) => {
@@ -154,14 +160,15 @@ export function GameClient() {
           };
         });
 
-        if (soundEnabled) {
-          speak("Correct!");
-        }
-
         feedbackTimeoutRef.current = setTimeout(() => {
           setFeedback(null);
-          nextProblem();
-        }, 1500);
+          if (isLastQuestion) {
+            endGame();
+          } else {
+            setStats((prev) => ({ ...prev, questionNumber: prev.questionNumber + 1 }));
+            nextProblem();
+          }
+        }, 1000);
       } else {
         setFeedback("incorrect");
         setStats((prev) => ({
@@ -171,7 +178,7 @@ export function GameClient() {
         }));
 
         if (soundEnabled) {
-          speak(`Incorrect. The answer is ${problem.answer}`);
+          speak(`The answer is ${problem.answer}`);
         }
 
         setShowCorrectAnswer(true);
@@ -181,10 +188,16 @@ export function GameClient() {
           setUserAnswer("");
           clearTranscript();
           lastProcessedRef.current = "";
-        }, 3000);
+          if (isLastQuestion) {
+            endGame();
+          } else {
+            setStats((prev) => ({ ...prev, questionNumber: prev.questionNumber + 1 }));
+            nextProblem();
+          }
+        }, 2500);
       }
     },
-    [problem, gameState, soundEnabled, speak, nextProblem, clearTranscript]
+    [problem, gameState, soundEnabled, speak, nextProblem, clearTranscript, endGame, stats.questionNumber]
   );
 
   // Process voice transcript
@@ -366,10 +379,10 @@ export function GameClient() {
           <div className="flex flex-col items-center gap-6 text-center">
             <div className="flex flex-col gap-2">
               <h2 className="text-2xl font-bold tracking-tight">
-                Session Complete
+                Round Complete
               </h2>
               <p className="text-sm text-muted-foreground">
-                Great work! Here&apos;s how you did
+                {stats.correct} out of {TOTAL_QUESTIONS} correct
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4 text-center">
@@ -414,6 +427,8 @@ export function GameClient() {
               score={stats.correct}
               streak={stats.streak}
               accuracy={accuracy}
+              questionNumber={stats.questionNumber}
+              totalQuestions={TOTAL_QUESTIONS}
             />
             <ProblemDisplay display={problem.display} feedback={feedback} />
             <AnswerDisplay
