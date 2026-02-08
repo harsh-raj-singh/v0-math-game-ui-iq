@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import {
   generateProblem,
   parseSpokenNumber,
@@ -10,6 +8,7 @@ import {
   type MathProblem,
   type Operation,
 } from "@/lib/game-utils";
+import { loadSettings, saveSettings, saveGameRecord } from "@/lib/storage";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useSpeechSynthesis } from "@/hooks/use-speech-synthesis";
 import { ProblemDisplay } from "@/components/game/problem-display";
@@ -25,7 +24,6 @@ import {
   Settings,
   BarChart3,
   HelpCircle,
-  LogOut,
   Play,
   Square,
 } from "lucide-react";
@@ -43,19 +41,8 @@ interface GameStats {
 }
 
 export function GameClient() {
-  const router = useRouter();
-  const supabase = createClient();
-
-  // If Supabase is not configured, still allow game to work without auth/persistence
-
-  // Auth
-  const [userId, setUserId] = useState<string | null>(null);
-
-  // Settings
-  const [operations, setOperations] = useState<Operation[]>([
-    "add",
-    "subtract",
-  ]);
+  // Settings (loaded from localStorage)
+  const [operations, setOperations] = useState<Operation[]>(["add", "subtract"]);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
 
@@ -93,36 +80,13 @@ export function GameClient() {
   const lastProcessedRef = useRef("");
   const isHoldingRef = useRef(false);
 
-  // Load user and settings
+  // Load settings from localStorage on mount
   useEffect(() => {
-    async function loadUser() {
-      if (!supabase) return;
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/auth/login");
-        return;
-      }
-      setUserId(user.id);
-
-      const { data: settings } = await supabase
-        .from("user_settings")
-        .select("*")
-        .eq("id", user.id)
-        .single();
-
-      if (settings) {
-        if (settings.operations?.length > 0) {
-          setOperations(settings.operations);
-        }
-        setSoundEnabled(settings.sound_enabled ?? true);
-        setVoiceEnabled(settings.voice_enabled ?? true);
-      }
-    }
-    loadUser();
-  }, [router, supabase]);
+    const settings = loadSettings();
+    setOperations(settings.operations);
+    setSoundEnabled(settings.soundEnabled);
+    setVoiceEnabled(settings.voiceEnabled);
+  }, []);
 
   // Generate next problem
   const nextProblem = useCallback(() => {
@@ -148,27 +112,25 @@ export function GameClient() {
     nextProblem();
   }, [nextProblem]);
 
-  // End game and save stats
-  const endGame = useCallback(async () => {
+  // End game and save stats to localStorage
+  const endGame = useCallback(() => {
     setGameState("ended");
     cancelSpeech();
 
-    if (supabase && userId && stats.correct + stats.wrong > 0) {
+    if (stats.correct + stats.wrong > 0) {
       const timeSpent = stats.startTime
         ? Math.floor((Date.now() - stats.startTime) / 1000)
         : 0;
 
-      await supabase.from("game_stats").insert({
-        user_id: userId,
-        score: stats.correct,
+      saveGameRecord({
         correct: stats.correct,
         wrong: stats.wrong,
         streak: stats.streak,
-        best_streak: stats.bestStreak,
-        time_spent_seconds: timeSpent,
+        bestStreak: stats.bestStreak,
+        timeSpentSeconds: timeSpent,
       });
     }
-  }, [userId, stats, supabase, cancelSpeech]);
+  }, [stats, cancelSpeech]);
 
   // Submit answer
   const submitAnswer = useCallback(
@@ -181,7 +143,6 @@ export function GameClient() {
       setUserAnswer(String(parsed));
 
       if (parsed === problem.answer) {
-        // Correct
         setFeedback("correct");
         setStats((prev) => {
           const newStreak = prev.streak + 1;
@@ -202,7 +163,6 @@ export function GameClient() {
           nextProblem();
         }, 1500);
       } else {
-        // Incorrect
         setFeedback("incorrect");
         setStats((prev) => ({
           ...prev,
@@ -234,7 +194,6 @@ export function GameClient() {
     const lower = transcript.toLowerCase().trim();
     if (lower === lastProcessedRef.current) return;
 
-    // Check commands
     if (lower.includes("stop") || lower.includes("end")) {
       lastProcessedRef.current = lower;
       endGame();
@@ -271,7 +230,6 @@ export function GameClient() {
       return;
     }
 
-    // Try to parse as number answer
     const parsed = parseSpokenNumber(lower);
     if (parsed !== null) {
       lastProcessedRef.current = lower;
@@ -306,7 +264,6 @@ export function GameClient() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === "Space" && !e.repeat && !isHoldingRef.current) {
-        // Don't hijack space if user is typing in an input
         if (
           e.target instanceof HTMLInputElement ||
           e.target instanceof HTMLTextAreaElement
@@ -346,14 +303,6 @@ export function GameClient() {
     };
   }, []);
 
-  // Sign out
-  const handleSignOut = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-    router.push("/auth/login");
-  };
-
   const accuracy =
     stats.correct + stats.wrong > 0
       ? Math.round((stats.correct / (stats.correct + stats.wrong)) * 100)
@@ -390,14 +339,6 @@ export function GameClient() {
             aria-label="Help"
           >
             <HelpCircle className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleSignOut}
-            aria-label="Sign out"
-          >
-            <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </header>
@@ -506,38 +447,23 @@ export function GameClient() {
           operations={operations}
           soundEnabled={soundEnabled}
           voiceEnabled={voiceEnabled}
-          onOperationsChange={async (ops) => {
+          onOperationsChange={(ops) => {
             setOperations(ops);
-            if (supabase && userId) {
-              await supabase
-                .from("user_settings")
-                .update({ operations: ops, updated_at: new Date().toISOString() })
-                .eq("id", userId);
-            }
+            saveSettings({ operations: ops });
           }}
-          onSoundChange={async (val) => {
+          onSoundChange={(val) => {
             setSoundEnabled(val);
-            if (supabase && userId) {
-              await supabase
-                .from("user_settings")
-                .update({ sound_enabled: val, updated_at: new Date().toISOString() })
-                .eq("id", userId);
-            }
+            saveSettings({ soundEnabled: val });
           }}
-          onVoiceChange={async (val) => {
+          onVoiceChange={(val) => {
             setVoiceEnabled(val);
-            if (supabase && userId) {
-              await supabase
-                .from("user_settings")
-                .update({ voice_enabled: val, updated_at: new Date().toISOString() })
-                .eq("id", userId);
-            }
+            saveSettings({ voiceEnabled: val });
           }}
           onClose={() => setOverlay(null)}
         />
       )}
       {overlay === "stats" && (
-        <StatsOverlay userId={userId} onClose={() => setOverlay(null)} />
+        <StatsOverlay onClose={() => setOverlay(null)} />
       )}
       {overlay === "help" && (
         <HelpOverlay onClose={() => setOverlay(null)} />

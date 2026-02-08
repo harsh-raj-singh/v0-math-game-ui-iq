@@ -3,7 +3,7 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { loadStats } from "@/lib/storage";
 
 interface StatsData {
   totalGames: number;
@@ -15,52 +15,33 @@ interface StatsData {
 }
 
 interface StatsOverlayProps {
-  userId: string | null;
   onClose: () => void;
 }
 
-export function StatsOverlay({ userId, onClose }: StatsOverlayProps) {
+export function StatsOverlay({ onClose }: StatsOverlayProps) {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function loadStats() {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
+    const records = loadStats();
+    if (records.length > 0) {
+      const totalCorrect = records.reduce((s, r) => s + r.correct, 0);
+      const totalWrong = records.reduce((s, r) => s + r.wrong, 0);
+      const bestStreak = Math.max(...records.map((r) => r.bestStreak));
+      const totalTime = records.reduce((s, r) => s + r.timeSpentSeconds, 0);
+      const total = totalCorrect + totalWrong;
 
-      const supabase = createClient();
-      if (!supabase) {
-        setLoading(false);
-        return;
-      }
-      const { data } = await supabase
-        .from("game_stats")
-        .select("*")
-        .eq("user_id", userId)
-        .order("played_at", { ascending: false });
-
-      if (data && data.length > 0) {
-        const totalCorrect = data.reduce((s, r) => s + r.correct, 0);
-        const totalWrong = data.reduce((s, r) => s + r.wrong, 0);
-        const bestStreak = Math.max(...data.map((r) => r.best_streak));
-        const totalTime = data.reduce((s, r) => s + r.time_spent_seconds, 0);
-        const total = totalCorrect + totalWrong;
-
-        setStats({
-          totalGames: data.length,
-          totalCorrect,
-          totalWrong,
-          bestStreak,
-          totalTime,
-          accuracy: total > 0 ? Math.round((totalCorrect / total) * 100) : 0,
-        });
-      }
-      setLoading(false);
+      setStats({
+        totalGames: records.length,
+        totalCorrect,
+        totalWrong,
+        bestStreak,
+        totalTime,
+        accuracy: total > 0 ? Math.round((totalCorrect / total) * 100) : 0,
+      });
     }
-    loadStats();
-  }, [userId]);
+    setLoading(false);
+  }, []);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
