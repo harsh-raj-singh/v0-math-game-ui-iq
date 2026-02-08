@@ -80,16 +80,15 @@ export function useSpeechRecognition() {
           });
 
           console.log("[v0] Transcribe response status:", response.status);
+          const data = await response.json();
+          console.log("[v0] Transcribe response body:", JSON.stringify(data));
           if (response.ok) {
-            const data = await response.json();
             const text = (data.text || "").trim();
-            console.log("[v0] Transcribed text:", JSON.stringify(text));
             if (text) {
               setTranscript(text);
             }
           } else {
-            const errText = await response.text();
-            console.warn("[v0] Transcription request failed:", response.status, errText);
+            console.warn("[v0] Transcription failed:", data.error, data.details);
           }
         } catch (err) {
           console.warn("Transcription error:", err);

@@ -20,21 +20,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Preserve original filename and type from client
+    // Convert incoming file to a proper buffer-backed Blob for outgoing fetch
+    const arrayBuffer = await audioFile.arrayBuffer();
     const fileName = audioFile instanceof File ? audioFile.name : "audio.webm";
+    const contentType = audioFile.type || "audio/webm";
 
-    console.log("[v0] Transcribe request - file size:", audioFile.size, "name:", fileName, "type:", audioFile.type);
+    console.log("[v0] Transcribe request - size:", arrayBuffer.byteLength, "name:", fileName, "type:", contentType);
+
+    const audioBlob = new Blob([arrayBuffer], { type: contentType });
 
     // Forward to Groq Whisper API
     const groqFormData = new FormData();
-    groqFormData.append("file", audioFile, fileName);
-    groqFormData.append("model", "distil-whisper-large-v3-en");
+    groqFormData.append("file", audioBlob, fileName);
+    groqFormData.append("model", "whisper-large-v3-turbo");
     groqFormData.append("language", "en");
     groqFormData.append("response_format", "json");
     groqFormData.append("temperature", "0.0");
     groqFormData.append(
       "prompt",
-      "The user is saying a number as an answer to a math problem. Numbers, digits, and math words like plus, minus, times, divided by. Also commands like start, stop, end, repeat, clear, settings, stats, help."
+      "The user is saying a number as an answer to a math problem. Transcribe the number they say."
     );
 
     const response = await fetch(
@@ -50,7 +54,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Groq API error:", response.status, errorText);
+      console.error("[v0] Groq API error:", response.status, errorText);
       return NextResponse.json(
         { error: "Transcription failed", details: errorText },
         { status: response.status }
@@ -61,7 +65,7 @@ export async function POST(request: NextRequest) {
     console.log("[v0] Groq transcription result:", JSON.stringify(result));
     return NextResponse.json({ text: result.text || "" });
   } catch (error) {
-    console.error("Transcription error:", error);
+    console.error("[v0] Transcription error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
