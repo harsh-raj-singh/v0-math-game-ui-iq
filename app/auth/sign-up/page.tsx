@@ -32,6 +32,12 @@ export default function SignUpPage() {
     setIsLoading(true);
     setError(null);
 
+    if (!supabase) {
+      setError("Authentication is not configured");
+      setIsLoading(false);
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       setIsLoading(false);

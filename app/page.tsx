@@ -8,12 +8,15 @@ import { Mic, Brain, BarChart3 } from "lucide-react";
 
 export default async function HomePage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
-  if (user) {
-    redirect("/game");
+  if (supabase) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      redirect("/game");
+    }
   }
 
   return (

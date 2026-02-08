@@ -46,6 +46,8 @@ export function GameClient() {
   const router = useRouter();
   const supabase = createClient();
 
+  // If Supabase is not configured, still allow game to work without auth/persistence
+
   // Auth
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -94,6 +96,8 @@ export function GameClient() {
   // Load user and settings
   useEffect(() => {
     async function loadUser() {
+      if (!supabase) return;
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -149,7 +153,7 @@ export function GameClient() {
     setGameState("ended");
     cancelSpeech();
 
-    if (userId && stats.correct + stats.wrong > 0) {
+    if (supabase && userId && stats.correct + stats.wrong > 0) {
       const timeSpent = stats.startTime
         ? Math.floor((Date.now() - stats.startTime) / 1000)
         : 0;
@@ -344,7 +348,9 @@ export function GameClient() {
 
   // Sign out
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
     router.push("/auth/login");
   };
 
@@ -502,7 +508,7 @@ export function GameClient() {
           voiceEnabled={voiceEnabled}
           onOperationsChange={async (ops) => {
             setOperations(ops);
-            if (userId) {
+            if (supabase && userId) {
               await supabase
                 .from("user_settings")
                 .update({ operations: ops, updated_at: new Date().toISOString() })
@@ -511,7 +517,7 @@ export function GameClient() {
           }}
           onSoundChange={async (val) => {
             setSoundEnabled(val);
-            if (userId) {
+            if (supabase && userId) {
               await supabase
                 .from("user_settings")
                 .update({ sound_enabled: val, updated_at: new Date().toISOString() })
@@ -520,7 +526,7 @@ export function GameClient() {
           }}
           onVoiceChange={async (val) => {
             setVoiceEnabled(val);
-            if (userId) {
+            if (supabase && userId) {
               await supabase
                 .from("user_settings")
                 .update({ voice_enabled: val, updated_at: new Date().toISOString() })

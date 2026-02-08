@@ -31,6 +31,10 @@ export function StatsOverlay({ userId, onClose }: StatsOverlayProps) {
       }
 
       const supabase = createClient();
+      if (!supabase) {
+        setLoading(false);
+        return;
+      }
       const { data } = await supabase
         .from("game_stats")
         .select("*")
