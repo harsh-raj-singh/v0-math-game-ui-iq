@@ -33,7 +33,7 @@ export function AnswerDisplay({
       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
         Your answer
       </span>
-      <div className="flex items-baseline gap-1">
+      <div className="flex flex-col items-center gap-1">
         <span
           className={cn(
             "font-mono text-4xl font-bold sm:text-5xl",
@@ -43,7 +43,7 @@ export function AnswerDisplay({
           {answer || "?"}
         </span>
         {interimText && (
-          <span className="font-mono text-2xl text-muted-foreground/60 sm:text-3xl">
+          <span className="text-xs font-medium text-muted-foreground animate-pulse">
             {interimText}
           </span>
         )}

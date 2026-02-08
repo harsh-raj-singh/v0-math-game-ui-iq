@@ -80,6 +80,7 @@ export default function GamePage() {
     transcript,
     interimTranscript,
     isSupported,
+    isTranscribing,
     startListening,
     stopListening,
     clearTranscript,
@@ -310,7 +311,7 @@ export default function GamePage() {
         e.preventDefault();
         isHoldingRef.current = true;
         clearTranscript();
-        startListening();
+        void startListening();
       }
       if (e.code === "Escape") {
         setOverlay(null);
@@ -474,9 +475,7 @@ export default function GamePage() {
               correctAnswer={problem.answer}
               showCorrectAnswer={showCorrectAnswer}
             />
-            {!isSupported && (
-              <KeyboardInput onSubmit={(val) => submitAnswer(val)} />
-            )}
+            <KeyboardInput onSubmit={(val) => submitAnswer(val)} />
             <Button
               variant="ghost"
               size="sm"
@@ -492,7 +491,7 @@ export default function GamePage() {
 
       {/* Bottom mic status */}
       <div className="fixed bottom-0 left-0 right-0 flex items-center justify-center border-t bg-background/80 px-4 py-3 backdrop-blur-sm">
-        <MicIndicator isListening={isListening} isSupported={isSupported} />
+        <MicIndicator isListening={isListening} isSupported={isSupported} isTranscribing={isTranscribing} />
       </div>
 
       {/* Overlays */}
