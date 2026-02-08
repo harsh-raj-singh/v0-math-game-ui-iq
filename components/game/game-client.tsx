@@ -195,10 +195,6 @@ export function GameClient() {
           streak: 0,
         }));
 
-        if (soundEnabled) {
-          speak(`The answer is ${problem.answer}`);
-        }
-
         setShowCorrectAnswer(true);
         feedbackTimeoutRef.current = setTimeout(() => {
           setShowCorrectAnswer(false);
