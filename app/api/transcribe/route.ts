@@ -20,9 +20,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Preserve original filename and type from client
+    const fileName = audioFile instanceof File ? audioFile.name : "audio.webm";
+
+    console.log("[v0] Transcribe request - file size:", audioFile.size, "name:", fileName, "type:", audioFile.type);
+
     // Forward to Groq Whisper API
     const groqFormData = new FormData();
-    groqFormData.append("file", audioFile, "audio.webm");
+    groqFormData.append("file", audioFile, fileName);
     groqFormData.append("model", "distil-whisper-large-v3-en");
     groqFormData.append("language", "en");
     groqFormData.append("response_format", "json");
@@ -53,6 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await response.json();
+    console.log("[v0] Groq transcription result:", JSON.stringify(result));
     return NextResponse.json({ text: result.text || "" });
   } catch (error) {
     console.error("Transcription error:", error);

@@ -45,15 +45,20 @@ export function useSpeechRecognition() {
         streamRef.current = null;
 
         const chunks = chunksRef.current;
+        console.log("[v0] Recording stopped - chunks:", chunks.length, "mimeType:", mimeType);
+
         if (chunks.length === 0) {
+          console.log("[v0] No chunks recorded, skipping");
           setIsListening(false);
           return;
         }
 
         const audioBlob = new Blob(chunks, { type: mimeType });
+        console.log("[v0] Audio blob size:", audioBlob.size);
 
         // Skip very short recordings (likely accidental taps)
         if (audioBlob.size < 1000) {
+          console.log("[v0] Blob too small, skipping");
           setIsListening(false);
           return;
         }
@@ -74,14 +79,17 @@ export function useSpeechRecognition() {
             body: formData,
           });
 
+          console.log("[v0] Transcribe response status:", response.status);
           if (response.ok) {
             const data = await response.json();
             const text = (data.text || "").trim();
+            console.log("[v0] Transcribed text:", JSON.stringify(text));
             if (text) {
               setTranscript(text);
             }
           } else {
-            console.warn("Transcription request failed:", response.status);
+            const errText = await response.text();
+            console.warn("[v0] Transcription request failed:", response.status, errText);
           }
         } catch (err) {
           console.warn("Transcription error:", err);

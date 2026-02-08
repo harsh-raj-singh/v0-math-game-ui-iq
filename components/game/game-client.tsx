@@ -60,6 +60,7 @@ export function GameClient() {
     wrong: 0,
     streak: 0,
     bestStreak: 0,
+    questionNumber: 0,
     startTime: null,
   });
 
@@ -79,7 +80,10 @@ export function GameClient() {
   } = useSpeechRecognition();
   const { speak, cancel: cancelSpeech } = useSpeechSynthesis();
 
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastProcessedRef = useRef("");
   const isHoldingRef = useRef(false);
 
@@ -105,6 +109,7 @@ export function GameClient() {
   // Start game
   const startGame = useCallback(() => {
     setGameState("playing");
+    setElapsedSeconds(0);
     setStats({
       correct: 0,
       wrong: 0,
@@ -113,6 +118,13 @@ export function GameClient() {
       questionNumber: 1,
       startTime: Date.now(),
     });
+
+    // Start the timer
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+    timerIntervalRef.current = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+
     nextProblem();
   }, [nextProblem]);
 
@@ -120,6 +132,12 @@ export function GameClient() {
   const endGame = useCallback(() => {
     setGameState("ended");
     cancelSpeech();
+
+    // Stop the timer
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
 
     if (stats.correct + stats.wrong > 0) {
       const timeSpent = stats.startTime
@@ -313,6 +331,7 @@ export function GameClient() {
   useEffect(() => {
     return () => {
       if (feedbackTimeoutRef.current) clearTimeout(feedbackTimeoutRef.current);
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
@@ -382,7 +401,8 @@ export function GameClient() {
                 Round Complete
               </h2>
               <p className="text-sm text-muted-foreground">
-                {stats.correct} out of {TOTAL_QUESTIONS} correct
+                {stats.correct} out of {TOTAL_QUESTIONS} correct in{" "}
+                {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
               </p>
             </div>
             <div className="grid grid-cols-2 gap-4 text-center">
@@ -410,6 +430,12 @@ export function GameClient() {
                   {stats.bestStreak}
                 </span>
               </div>
+              <div className="col-span-2 flex flex-col rounded-lg border bg-card p-4">
+                <span className="text-xs text-muted-foreground">Total Time</span>
+                <span className="font-mono text-2xl font-bold">
+                  {Math.floor(elapsedSeconds / 60)}:{(elapsedSeconds % 60).toString().padStart(2, "0")}
+                </span>
+              </div>
             </div>
             <Button onClick={startGame} size="lg" className="gap-2">
               <Play className="h-4 w-4" aria-hidden="true" />
@@ -429,6 +455,7 @@ export function GameClient() {
               accuracy={accuracy}
               questionNumber={stats.questionNumber}
               totalQuestions={TOTAL_QUESTIONS}
+              elapsedSeconds={elapsedSeconds}
             />
             <ProblemDisplay display={problem.display} feedback={feedback} />
             <AnswerDisplay
